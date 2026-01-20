@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# Compiled binaries
+MacIntel
+*.o
+*.swiftdeps
+*.swiftmodule
+
+# App Bundle (exclude from repo - built locally)
+MacIntelligence.app/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# User-specific files
+*.log
+*.tmp
+
+# API Keys and Secrets (NEVER commit these)
+*.pem
+*.key
+secrets/
+.env
+.env.local
