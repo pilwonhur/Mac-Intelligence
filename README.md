@@ -19,7 +19,8 @@ No more switching between apps. No more copy-pasting into a browser. Just select
 ### ✨ Key Features
 
 - **🎯 Universal Text Capture**: Works with virtually any application—Safari, Chrome, MS Word, TextEdit, MS Teams, Preview, and more
-- **🤖 Dual AI Support**: Choose between **OpenAI GPT-4o** or **Google Gemini 2.5 Flash**
+- **🤖 Multi-Provider AI Support**: Choose between **OpenAI**, **Google Gemini**, or **Anthropic Claude**
+- **🧩 Selectable & Custom Models**: Pick from built-in models per provider, or type any exact model ID to add it to your list permanently
 - **🌐 Live Web Search**: Enable real-time Google Search grounding for up-to-date information
 - **💬 Conversational Memory**: Multi-turn chat that remembers previous context
 - **🪟 Ghost Window**: Non-intrusive floating panel that doesn't steal focus from your work
@@ -48,14 +49,14 @@ The assistant automatically captures:
 
 - **macOS 13.0** (Ventura) or later
 - **Swift 6.0+** (included with Xcode)
-- **API Keys** for OpenAI and/or Google Gemini
+- **API Keys** for at least one of OpenAI, Google Gemini, or Anthropic
 
 ### Build from Source
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/pilwonhur/mac-intelligence.git
-cd mac-intelligence
+git clone https://github.com/pilwonhur/Mac-Intelligence.git
+cd Mac-Intelligence
 ```
 
 2. **Build the application bundle**
@@ -68,6 +69,12 @@ chmod +x build_app.sh
 ```bash
 mv MacIntelligence.app /Applications/
 ```
+> `build_app.sh` only rebuilds the copy inside the project folder—it does **not** update `/Applications` automatically. After every rebuild, reinstall manually:
+> ```bash
+> pkill MacIntelligence
+> rm -rf /Applications/MacIntelligence.app
+> cp -R MacIntelligence.app /Applications/
+> ```
 
 4. **Launch the app**
 ```bash
@@ -102,17 +109,22 @@ On first launch, macOS will prompt for the following permissions:
    - **Safari**: Safari > Settings > Advanced > "Show Develop menu" → Develop > "Allow JavaScript from Apple Events"
    - **Chrome**: View > Developer > "Allow JavaScript from Apple Events"
 
-### Setting Up API Keys
+### Setting Up API Keys & Models
 
 1. Press `Cmd + Shift + K` to open Mac Intelligence
 2. Click the **⚙️ Settings** icon
-3. Select your preferred AI provider (OpenAI or Gemini)
-4. Paste your API key
-5. Click **Save and Close**
+3. Under **Preferred AI**, pick the provider you want to query with (OpenAI, Gemini, or Anthropic)
+4. Under **Configure Provider**, select each provider you plan to use and:
+   - Paste its API key (a green checkmark confirms it's set; Settings also flags any provider with no key entered)
+   - Pick a model from the dropdown, or type an exact model ID into **Add Model**—once added, it stays selectable in future sessions
+5. Click **Save and Close** (or the ❌ button—both save automatically)
+
+Selections persist immediately, so your last-used provider and model are restored the next time you open the app—no need to re-save.
 
 **Get API Keys:**
 - OpenAI: [platform.openai.com](https://platform.openai.com)
 - Gemini: [aistudio.google.com](https://aistudio.google.com)
+- Anthropic: [console.anthropic.com](https://console.anthropic.com)
 
 ---
 
@@ -134,6 +146,16 @@ On first launch, macOS will prompt for the following permissions:
 
 - **🌐 Web Search**: Enable real-time web search for current events and live data (Gemini only)
 
+### Built-in Models
+
+| Provider | Built-in Models |
+|----------|------------------|
+| OpenAI | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-4o` |
+| Gemini | `gemini-3.6-flash`, `gemini-3.1-pro-preview`, `gemini-2.5-flash` |
+| Anthropic | `claude-fable-5`, `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5` |
+
+Type any other exact model ID into **Add Model** in Settings to add it to a provider's list.
+
 ### Tips
 
 - Use the trash icon to clear chat and start fresh while keeping the selected context
@@ -154,13 +176,13 @@ Source/
 ├── Services/
 │   ├── CaptureService.swift # Text capture engine (Accessibility + AppleScript)
 │   ├── HotKeyService.swift  # Global keyboard shortcut handler
-│   ├── LLMService.swift     # AI provider integration (OpenAI/Gemini)
+│   ├── LLMService.swift     # AI provider integration (OpenAI/Gemini/Anthropic)
 │   └── KeychainService.swift# Secure API key storage
 ├── Views/
 │   ├── MainView.swift       # Primary chat interface
-│   └── SettingsView.swift   # Configuration panel
+│   └── SettingsView.swift   # Configuration panel (providers, keys, models)
 └── Models/
-    ├── AppState.swift       # Global application state
+    ├── AppState.swift       # Global state, per-provider keys/models, persistence
     └── ChatMessage.swift    # Chat message model
 ```
 
@@ -172,7 +194,7 @@ Source/
 | UI Framework | SwiftUI |
 | System Integration | AppKit (NSPanel, NSEvent) |
 | Text Capture | Accessibility API, AppleScript |
-| AI Providers | OpenAI GPT-4o, Google Gemini 2.5 Flash |
+| AI Providers | OpenAI, Google Gemini, Anthropic Claude (selectable models, see below) |
 | Concurrency | Swift Structured Concurrency (async/await) |
 
 ### Text Capture Strategy
@@ -213,7 +235,7 @@ mac-intelligence/
 
 ## 🚧 Roadmap
 
-- [ ] Claude (Anthropic) integration
+- [x] Claude (Anthropic) integration
 - [ ] Custom system prompts
 - [ ] Conversation history persistence
 - [ ] Menu bar icon with quick actions
@@ -249,7 +271,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Built with ❤️ using Swift and SwiftUI
-- Powered by OpenAI and Google Gemini APIs
+- Powered by OpenAI, Google Gemini, and Anthropic Claude APIs
 - Inspired by the need for seamless AI integration into daily macOS workflows
 
 ---
