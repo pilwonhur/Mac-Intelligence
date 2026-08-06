@@ -2,80 +2,170 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var state: AppState
-    @State private var tempOpenAIKey: String = ""
-    @State private var tempGeminiKey: String = ""
-    
+    @State private var configProvider: AppState.AIProvider = .openai
+    @State private var newModelName: String = ""
+
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             HStack {
                 Text("Settings")
                     .font(.headline)
                 Spacer()
-                Button(action: { state.showSettings = false }) {
+                Button(action: saveAndClose) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.bottom, 5)
-            
-            // Provider Selection
-            Picker("Preferred AI", selection: $state.selectedProvider) {
-                ForEach(AppState.AIProvider.allCases, id: \.self) { provider in
-                    Text(provider.rawValue).tag(provider)
+
+            // Preferred provider (used for queries)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Preferred AI")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                Picker("", selection: $state.selectedProvider) {
+                    ForEach(AppState.AIProvider.allCases, id: \.self) { provider in
+                        Text(provider.rawValue).tag(provider)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                if !providersMissingKeys.isEmpty {
+                    Text("⚠️ No API key entered for: \(providersMissingKeys.map { $0.rawValue }.joined(separator: ", "))")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.orange)
                 }
             }
-            .pickerStyle(.segmented)
-            
+
+            Divider()
+
+            // Per-provider configuration
             VStack(alignment: .leading, spacing: 12) {
-                // OpenAI Section
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("OpenAI API Key")
+                    Text("Configure Provider")
                         .font(.caption)
                         .fontWeight(.bold)
-                    SecureField("sk-...", text: $tempOpenAIKey)
+                    Picker("", selection: $configProvider) {
+                        ForEach(AppState.AIProvider.allCases, id: \.self) { provider in
+                            Text(provider.rawValue).tag(provider)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text("\(configProvider.rawValue) API Key")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                        if (state.apiKeys[configProvider] ?? "").isEmpty {
+                            Text("— not set")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                    }
+                    SecureField(keyPlaceholder, text: apiKeyBinding)
                         .textFieldStyle(.roundedBorder)
                 }
-                
-                // Gemini Section
+
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Gemini API Key")
+                    Text("Model")
                         .font(.caption)
                         .fontWeight(.bold)
-                    SecureField("Enter Gemini Key...", text: $tempGeminiKey)
-                        .textFieldStyle(.roundedBorder)
+                    Picker("", selection: modelBinding) {
+                        ForEach(state.models(for: configProvider), id: \.self) { model in
+                            Text(model).tag(model)
+                        }
+                    }
+                    .labelsHidden()
                 }
-                
-                Text("Keys are stored locally on your Mac.")
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Add Model")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                    HStack(spacing: 6) {
+                        TextField(modelPlaceholder, text: $newModelName)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(addModel)
+                        Button(action: addModel) {
+                            Image(systemName: "plus.circle.fill")
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(newModelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    Text("Type the exact model ID. It stays selectable afterwards.")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+
+                Text("Keys and models are stored locally on your Mac.")
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
             }
-            
-            Button(action: saveKeys) {
+
+            Button(action: saveAndClose) {
                 Text("Save and Close")
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
             }
             .buttonStyle(.borderedProminent)
-            
+
             Spacer()
         }
         .padding()
         .onAppear {
-            tempOpenAIKey = KeychainService.shared.get(key: "openai_api_key") ?? ""
-            tempGeminiKey = KeychainService.shared.get(key: "gemini_api_key") ?? ""
+            configProvider = state.selectedProvider
         }
     }
-    
-    func saveKeys() {
-        KeychainService.shared.save(key: "openai_api_key", value: tempOpenAIKey)
-        KeychainService.shared.save(key: "gemini_api_key", value: tempGeminiKey)
-        state.apiKey = tempOpenAIKey
-        state.geminiKey = tempGeminiKey
-        
-        // Save preferred provider to defaults for next launch
-        UserDefaults.standard.set(state.selectedProvider.rawValue, forKey: "selected_provider")
-        
+
+    private var providersMissingKeys: [AppState.AIProvider] {
+        AppState.AIProvider.allCases.filter { (state.apiKeys[$0] ?? "").isEmpty }
+    }
+
+    private var apiKeyBinding: Binding<String> {
+        Binding(
+            get: { state.apiKeys[configProvider] ?? "" },
+            set: { state.apiKeys[configProvider] = $0 }
+        )
+    }
+
+    private var modelBinding: Binding<String> {
+        Binding(
+            get: { state.selectedModel(for: configProvider) },
+            set: { state.selectedModels[configProvider] = $0 }
+        )
+    }
+
+    private var keyPlaceholder: String {
+        switch configProvider {
+        case .openai: return "sk-..."
+        case .gemini: return "Enter Gemini Key..."
+        case .anthropic: return "sk-ant-..."
+        }
+    }
+
+    private var modelPlaceholder: String {
+        switch configProvider {
+        case .openai: return "e.g. gpt-4o-mini"
+        case .gemini: return "e.g. gemini-2.5-pro"
+        case .anthropic: return "e.g. claude-sonnet-5"
+        }
+    }
+
+    private func addModel() {
+        state.addModel(newModelName, for: configProvider)
+        newModelName = ""
+    }
+
+    private func saveAndClose() {
+        state.saveSettings()
         state.showSettings = false
     }
 }

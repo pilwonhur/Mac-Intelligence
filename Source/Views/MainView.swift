@@ -27,9 +27,16 @@ struct MainView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Mac Intelligence by Pilwon Hur")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
-                    Text(state.selectedProvider == .openai ? "GPT-4o" : "Gemini 2.5 Flash")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.blue.opacity(0.7))
+                    HStack(spacing: 4) {
+                        Text("\(state.selectedProvider.rawValue) · \(state.selectedModel(for: state.selectedProvider))")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.blue.opacity(0.7))
+                        if state.apiKey(for: state.selectedProvider).isEmpty {
+                            Text("⚠️ No API key")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.orange)
+                        }
+                    }
                 }
                 Spacer()
                 Button(action: { 
@@ -91,7 +98,7 @@ struct MainView: View {
         HStack {
             if message.role == .user { Spacer() }
                         VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                Text(message.role == .user ? "YOU" : (state.selectedProvider == .openai ? "GPT-4o" : "GEMINI 2.5 FLASH"))
+                Text(message.role == .user ? "YOU" : state.selectedModel(for: state.selectedProvider).uppercased())
                     .font(.system(size: 8, weight: .black))
                     .foregroundColor(message.role == .user ? .secondary : .blue)
                 
@@ -178,9 +185,9 @@ struct MainView: View {
                         .font(.system(size: 10, weight: .bold))
                     }
                     .toggleStyle(.checkbox)
-                    .disabled(state.selectedProvider == .openai)
-                    
-                    if state.selectedProvider == .openai && state.useWebSearch {
+                    .disabled(state.selectedProvider != .gemini)
+
+                    if state.selectedProvider != .gemini && state.useWebSearch {
                         Text("(Gemini only)")
                             .font(.system(size: 8))
                             .foregroundColor(.secondary)
@@ -198,28 +205,35 @@ struct MainView: View {
         
         let prompt = userPrompt
         let context = state.capturedText
-        let provider: LLMService.Provider = (state.selectedProvider == .openai) ? .openai : .gemini
-        let apiKey = (provider == .openai) ? state.apiKey : state.geminiKey
+        let provider: LLMService.Provider
+        switch state.selectedProvider {
+        case .openai: provider = .openai
+        case .gemini: provider = .gemini
+        case .anthropic: provider = .anthropic
+        }
+        let model = state.selectedModel(for: state.selectedProvider)
+        let apiKey = state.apiKey(for: state.selectedProvider)
         let useWebSearch = state.useWebSearch
         let history = state.messages
-        
+
         // Add User Message
         state.messages.append(ChatMessage(role: .user, content: prompt))
         userPrompt = ""
-        
+
         // Add Placeholder Assistant Message
         let aiMessageIndex = state.messages.count
         state.messages.append(ChatMessage(role: .assistant, content: ""))
         state.isProcessing = true
-        
+
         if apiKey.isEmpty {
-            state.messages[aiMessageIndex].content = "⚠️ Please set your \(provider == .openai ? "OpenAI" : "Gemini") API Key in Settings (⚙️)."
+            state.messages[aiMessageIndex].content = "⚠️ Please set your \(state.selectedProvider.rawValue) API Key in Settings (⚙️)."
             state.isProcessing = false
             return
         }
-        
+
         LLMService.shared.streamCompletion(
             provider: provider,
+            model: model,
             prompt: prompt,
             context: context,
             history: history,

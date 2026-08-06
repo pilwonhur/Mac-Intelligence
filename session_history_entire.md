@@ -1294,3 +1294,50 @@ I've added a Quit button to the top-right header! 🛑🔋
 - Power Icon: You'll now see a small red power icon (⌽) in the top-right corner, next to the settings gear.
 - Fully Kills Process: Clicking this will immediately terminate the application and remove it from your memory/Activity Monitor. This is perfect for when you want to completely shut down the "ghost" process without hunting for it in the Task Manager.
 The app has been rebuilt and is ready for you to use! 🚀🛑
+---
+
+# Session 2026-08-06: Selectable Models, Anthropic Support, Persistent Settings
+
+## what LLM model can be used in Mac Intelligence?
+
+Reviewed the codebase and reported the state at the time: two providers with hardcoded models — OpenAI (`gpt-4o` in `LLMService.swift`) and Gemini (`gemini-2.5-flash`). Model names were not user-configurable, and there was no Anthropic support.
+
+## I want the model to be selectable. Users can type the exact model and API key for the corresponding service provider (e.g., openAI, gemini, Anthropic). If the user types in a specific model, then the model will become selectable thereafter. Once API key has been entered previously, the user does not have to re-enter it.
+
+### What was implemented:
+1. **Anthropic as a third provider** (`LLMService.swift`): streams from the Anthropic Messages API (`https://api.anthropic.com/v1/messages`) with `x-api-key` + `anthropic-version: 2023-06-01` headers, SSE parsing of `content_block_delta` events, `max_tokens: 8192`, and API error events surfaced in the chat.
+2. **Model parameter everywhere**: `streamCompletion(provider:model:...)` — no provider has a hardcoded model anymore.
+3. **Per-provider model lists** (`AppState.swift`): built-in defaults plus user-added custom models, persisted in UserDefaults (`custom_models_<Provider>`, `selected_model_<Provider>`).
+4. **Settings redesign** (`SettingsView.swift`): "Configure Provider" segmented picker → per-provider API key field, model dropdown, and an "Add Model" text field. A typed model ID is added to the dropdown and selected immediately.
+5. **API keys per provider** stored locally (`openai_api_key`, `gemini_api_key`, `anthropic_api_key`) and loaded at launch — never re-entered.
+6. **MainView**: header shows `Provider · model`; chat bubbles are labeled with the active model; web-search toggle is now Gemini-only via `!= .gemini` check.
+
+## Also, if no API keys are entered for specific service providers, indicate it.
+
+- Settings shows a summary line "⚠️ No API key entered for: ..." under the provider picker.
+- Each provider's key field shows a green checkmark (set) or orange "— not set".
+- The main window header shows a "⚠️ No API key" badge when the active provider has no key.
+
+## Please add the built-in models for each service provider
+
+Built-in model lists updated in `AppState.builtInModels`:
+- **OpenAI**: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-4o`
+- **Gemini**: `gemini-3.6-flash`, `gemini-3.1-pro-preview`, `gemini-2.5-flash`
+- **Anthropic**: `claude-fable-5`, `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`
+
+The first entry of each list is the default for a fresh install; previous defaults were kept so existing selections continue to work.
+
+## I want the app to remember the previously selected model.
+
+Root cause: the selection was only persisted by "Save and Close" — closing Settings with the ✕ button discarded it. Fixes:
+1. `AppState` now persists selected model, preferred provider, and custom model lists to UserDefaults **immediately on change** (Combine sinks in `init()`), so selections survive any way Settings is closed or the app quits.
+2. The ✕ button in Settings now runs the same save as "Save and Close", so API keys typed before ✕ are kept too.
+
+### Files touched this session:
+- `Source/Models/AppState.swift` — providers, model lists, persistence, autosave
+- `Source/Services/LLMService.swift` — model parameter, Anthropic streaming
+- `Source/Views/SettingsView.swift` — per-provider config UI, add-model field, key indicators
+- `Source/Views/MainView.swift` — model display, provider routing, no-key badge
+- `Source/Core/main.swift` — simplified to `state.loadSettings()`
+
+Rebuilt via `./build_app.sh` after each change; all builds succeeded (only a pre-existing `onChange` deprecation warning remains).

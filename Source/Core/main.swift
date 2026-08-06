@@ -8,14 +8,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 0. Load Settings
-        state.apiKey = KeychainService.shared.get(key: "openai_api_key") ?? ""
-        state.geminiKey = KeychainService.shared.get(key: "gemini_api_key") ?? ""
-        
-        if let savedProvider = UserDefaults.standard.string(forKey: "selected_provider"),
-           let provider = AppState.AIProvider(rawValue: savedProvider) {
-            state.selectedProvider = provider
-        }
+        // 0. Load Settings (API keys, models, preferred provider)
+        state.loadSettings()
         
         setupMenu()
         
