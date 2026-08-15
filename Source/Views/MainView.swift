@@ -215,6 +215,8 @@ struct MainView: View {
         let provider = state.selectedProvider
         let authMethod = state.authMethod(for: provider)
         let model = state.selectedModel(for: provider)
+        // First keychain touch happens here, not at launch — and only on the API-key path.
+        if authMethod == .apiKey { state.ensureAPIKeyLoaded(for: provider) }
         let apiKey = state.apiKey(for: provider)
         let useWebSearch = state.useWebSearch
         let history = state.messages

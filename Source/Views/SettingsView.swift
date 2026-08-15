@@ -186,22 +186,28 @@ struct SettingsView: View {
                 Text("\(configProvider.rawValue) API Key")
                     .font(.caption)
                     .fontWeight(.bold)
-                if (state.apiKeys[configProvider] ?? "").isEmpty {
-                    Text("— not set")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                } else {
+                switch state.hasAPIKey(for: configProvider) {
+                case .some(true):
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundColor(.green)
+                case .some(false):
+                    Text("— not set")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                case .none:
+                    EmptyView()
                 }
             }
             SecureField(keyPlaceholder, text: apiKeyBinding)
                 .textFieldStyle(.roundedBorder)
-            Text("Stored in your login keychain.")
+            Text("Stored in your login keychain, and read only when needed.")
                 .font(.system(size: 9))
                 .foregroundColor(.secondary)
         }
+        // Showing the field is the point at which the stored key is actually needed.
+        .onAppear { state.ensureAPIKeyLoaded(for: configProvider) }
+        .onChange(of: configProvider) { _ in state.ensureAPIKeyLoaded(for: configProvider) }
     }
 
     private var modelSection: some View {

@@ -135,6 +135,39 @@ class AppState: ObservableObject {
         return apiKeys[provider] ?? ""
     }
 
+    // MARK: - Lazy API key loading
+    //
+    // Reading the keychain makes macOS prompt for the login password whenever the app's
+    // code identity is unrecognized — and this app is ad-hoc signed, so its identity
+    // changes on every rebuild and "Always Allow" does not stick. Since OAuth is the
+    // default path and needs no key at all, nothing is read until a key is actually
+    // needed: sending a request on the API-key path, or opening its field in Settings.
+    //
+    // Whether a key *exists* is tracked separately in UserDefaults so the UI can show
+    // readiness without touching the secret itself.
+
+    private var loadedAPIKeys: Set<AIProvider> = []
+
+    private static func presenceKey(for provider: AIProvider) -> String {
+        "has_api_key_\(provider.rawValue)"
+    }
+
+    /// Reads the keychain once per provider and caches the result.
+    func ensureAPIKeyLoaded(for provider: AIProvider) {
+        guard !loadedAPIKeys.contains(provider) else { return }
+        loadedAPIKeys.insert(provider)
+        let key = KeychainService.shared.get(key: AppState.keychainKey(for: provider)) ?? ""
+        apiKeys[provider] = key
+        UserDefaults.standard.set(!key.isEmpty, forKey: AppState.presenceKey(for: provider))
+    }
+
+    /// True when a key is known to be stored, without reading it.
+    /// Nil means "not looked at yet" — the app has had no reason to check.
+    func hasAPIKey(for provider: AIProvider) -> Bool? {
+        if loadedAPIKeys.contains(provider) { return !apiKey(for: provider).isEmpty }
+        return UserDefaults.standard.object(forKey: AppState.presenceKey(for: provider)) as? Bool
+    }
+
     // MARK: - Auth
 
     /// The auth method actually in effect, ignoring a stored choice the provider cannot honor.
@@ -145,14 +178,17 @@ class AppState: ObservableObject {
         return stored
     }
 
-    /// Whether the selected auth method is actually usable right now.
+    /// Whether the selected auth method is usable right now.
+    /// Must stay free of keychain reads — SwiftUI calls this during view rendering.
     func isAuthReady(for provider: AIProvider) -> Bool {
         switch authMethod(for: provider) {
         case .oauth:
             guard let tool = provider.cliTool else { return false }
             return CLIDiscovery.locate(tool) != nil
         case .apiKey:
-            return !apiKey(for: provider).isEmpty
+            // Unknown counts as ready: warning about a key we have not looked at would be
+            // a guess, and submitQuery checks for real before sending.
+            return hasAPIKey(for: provider) ?? true
         }
     }
 
@@ -180,8 +216,8 @@ class AppState: ObservableObject {
     }
 
     func loadSettings() {
+        // API keys are deliberately not read here — see ensureAPIKeyLoaded(for:).
         for provider in AIProvider.allCases {
-            apiKeys[provider] = KeychainService.shared.get(key: AppState.keychainKey(for: provider)) ?? ""
             customModels[provider] = UserDefaults.standard.stringArray(forKey: "custom_models_\(provider.rawValue)") ?? []
             if let model = UserDefaults.standard.string(forKey: "selected_model_\(provider.rawValue)") {
                 selectedModels[provider] = model
@@ -201,7 +237,13 @@ class AppState: ObservableObject {
 
     func saveSettings() {
         for provider in AIProvider.allCases {
-            KeychainService.shared.save(key: AppState.keychainKey(for: provider), value: apiKeys[provider] ?? "")
+            // Only providers whose key was actually loaded may be written back. Saving an
+            // unloaded provider would persist an empty string over a stored key.
+            if loadedAPIKeys.contains(provider) {
+                let key = apiKeys[provider] ?? ""
+                KeychainService.shared.save(key: AppState.keychainKey(for: provider), value: key)
+                UserDefaults.standard.set(!key.isEmpty, forKey: AppState.presenceKey(for: provider))
+            }
             UserDefaults.standard.set(customModels[provider] ?? [], forKey: "custom_models_\(provider.rawValue)")
             UserDefaults.standard.set(selectedModel(for: provider), forKey: "selected_model_\(provider.rawValue)")
             UserDefaults.standard.set(authMethod(for: provider).rawValue, forKey: "auth_method_\(provider.rawValue)")
