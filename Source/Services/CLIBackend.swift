@@ -226,7 +226,7 @@ final class CLIBackend {
             // The context-trimming flags matter: every call ships Claude Code's agent
             // scaffolding, and a ghost-panel question is only a few dozen tokens against it.
             // Measured on claude-haiku-4-5, per short query:
-            //   no flags (llm-wiki's command line) ..... ~26,500 tokens
+            //   bare `claude -p X --output-format json` .. ~26,500 tokens
             //   + --setting-sources "" --strict-mcp-config ~17,150
             //   + --system-prompt --exclude-dynamic... ... ~10,850
             // --system-prompt replaces Claude Code's coding-agent prompt outright, which is

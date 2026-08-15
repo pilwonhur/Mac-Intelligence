@@ -62,13 +62,20 @@ git clone https://github.com/pilwonhur/Mac-Intelligence.git
 cd Mac-Intelligence
 ```
 
-2. **Build the application bundle**
+2. **Create a local signing certificate** (once per machine, recommended)
+```bash
+chmod +x make_signing_cert.sh
+./make_signing_cert.sh
+```
+Without it the build falls back to ad-hoc signing, and macOS re-prompts for keychain access and Accessibility permission **after every rebuild** — see [Why a signing certificate](#why-a-signing-certificate) below.
+
+3. **Build the application bundle**
 ```bash
 chmod +x build_app.sh
 ./build_app.sh
 ```
 
-3. **Move to Applications (optional)**
+4. **Move to Applications (optional)**
 ```bash
 mv MacIntelligence.app /Applications/
 ```
@@ -79,7 +86,7 @@ mv MacIntelligence.app /Applications/
 > cp -R MacIntelligence.app /Applications/
 > ```
 
-4. **Launch the app**
+5. **Launch the app**
 ```bash
 open MacIntelligence.app
 ```
@@ -111,6 +118,28 @@ On first launch, macOS will prompt for the following permissions:
 3. **Browser Settings** (For full context from browsers)
    - **Safari**: Safari > Settings > Advanced > "Show Develop menu" → Develop > "Allow JavaScript from Apple Events"
    - **Chrome**: View > Developer > "Allow JavaScript from Apple Events"
+
+### Why a signing certificate
+
+macOS binds keychain ACLs and Accessibility (TCC) permissions to an app's **designated requirement**. Ad-hoc signing (`codesign --sign -`) produces one built from the code hash:
+
+```
+designated => cdhash H"8c6a3164c0b7975ee710e1d6e90be0bbe85170c4"
+```
+
+That hash changes on every rebuild, so macOS sees a brand-new app each time: it re-asks for the login keychain password, and Accessibility access has to be granted again. **"Always Allow" never sticks.**
+
+`make_signing_cert.sh` creates a self-signed certificate in your login keychain, and `build_app.sh` signs with it when present. The requirement becomes:
+
+```
+designated => identifier "com.pilwonhur.MacIntelligence" and certificate root = H"b419dab9..."
+```
+
+Both halves survive rebuilds, so permissions granted once stay granted.
+
+The certificate is for local permission stability only. It is not from Apple, so it does nothing for Gatekeeper or for distributing the app to anyone else. No administrator password or trust-settings change is needed — `codesign` finds the identity in the keychain directly.
+
+> **One-time transition:** the identity changes when you first adopt the certificate, so macOS asks once more for keychain access (click **Always Allow**) and Accessibility must be re-granted — remove the old entry in System Settings and re-add the rebuilt app. After that it is permanent.
 
 ### Setting Up Authentication & Models
 
@@ -265,6 +294,7 @@ mac-intelligence/
 ## 🔒 Privacy & Security
 
 - **No token handling**: On the OAuth path the app never sees a token, client ID, or credentials file—it invokes the vendor CLI you already signed into, and that CLI owns its session
+- **Stable code identity**: builds are signed with a local certificate (see `make_signing_cert.sh`) so keychain and Accessibility permissions survive rebuilds
 - **Local-first**: API keys are stored in your login keychain (not uploaded anywhere). Keys written by earlier plain-text builds are migrated automatically on first read
 - **No data retention**: Your text selections and conversations are not stored on any server
 - **Direct calls**: Communication goes directly to the provider or through its official CLI—no intermediary servers

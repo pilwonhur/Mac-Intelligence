@@ -44,6 +44,7 @@ MacIntelligence.app/
 # API Keys and Secrets (NEVER commit these)
 *.pem
 *.key
+*.p12
 secrets/
 .env
 .env.local

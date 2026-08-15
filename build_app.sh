@@ -65,9 +65,22 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
 </plist>
 EOF
 
-# 4. Ad-hoc sign the app (Crucial for macOS security)
+# 4. Sign the app (Crucial for macOS security)
+#
+# Prefer a stable certificate over ad-hoc signing. Keychain ACLs and Accessibility
+# permissions bind to the designated requirement, and ad-hoc signing puts the build's
+# cdhash in it — so every rebuild looks like a new app and macOS re-prompts for both.
+# See make_signing_cert.sh.
+SIGN_IDENTITY="Mac Intelligence Local Signing"
 echo "🔐 Signing $BUNDLE_NAME..."
-codesign --force --deep --sign - "$BUNDLE_NAME"
+if security find-certificate -c "$SIGN_IDENTITY" >/dev/null 2>&1; then
+    codesign --force --deep --sign "$SIGN_IDENTITY" "$BUNDLE_NAME"
+else
+    echo "⚠️  '$SIGN_IDENTITY' not in the keychain — falling back to ad-hoc signing."
+    echo "   macOS will re-prompt for keychain access and Accessibility after every"
+    echo "   rebuild. Run ./make_signing_cert.sh once to stop that."
+    codesign --force --deep --sign - "$BUNDLE_NAME"
+fi
 
 echo "✅ $BUNDLE_NAME created successfully!"
 echo "🚀 You can now move it to /Applications or open it with 'open $BUNDLE_NAME'"
