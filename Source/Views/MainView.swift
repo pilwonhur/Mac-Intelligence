@@ -31,8 +31,15 @@ struct MainView: View {
                         Text("\(state.selectedProvider.rawValue) · \(state.selectedModel(for: state.selectedProvider))")
                             .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.blue.opacity(0.7))
-                        if state.apiKey(for: state.selectedProvider).isEmpty {
-                            Text("⚠️ No API key")
+                        Text(state.authMethod(for: state.selectedProvider).rawValue)
+                            .font(.system(size: 8, weight: .bold))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.blue.opacity(0.18))
+                            .cornerRadius(3)
+                            .foregroundColor(.blue.opacity(0.9))
+                        if let problem = state.authProblem(for: state.selectedProvider) {
+                            Text("⚠️ \(problem)")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.orange)
                         }
@@ -205,14 +212,10 @@ struct MainView: View {
         
         let prompt = userPrompt
         let context = state.capturedText
-        let provider: LLMService.Provider
-        switch state.selectedProvider {
-        case .openai: provider = .openai
-        case .gemini: provider = .gemini
-        case .anthropic: provider = .anthropic
-        }
-        let model = state.selectedModel(for: state.selectedProvider)
-        let apiKey = state.apiKey(for: state.selectedProvider)
+        let provider = state.selectedProvider
+        let authMethod = state.authMethod(for: provider)
+        let model = state.selectedModel(for: provider)
+        let apiKey = state.apiKey(for: provider)
         let useWebSearch = state.useWebSearch
         let history = state.messages
 
@@ -225,14 +228,18 @@ struct MainView: View {
         state.messages.append(ChatMessage(role: .assistant, content: ""))
         state.isProcessing = true
 
-        if apiKey.isEmpty {
-            state.messages[aiMessageIndex].content = "⚠️ Please set your \(state.selectedProvider.rawValue) API Key in Settings (⚙️)."
+        if let problem = state.authProblem(for: provider) {
+            let fix = authMethod == .oauth
+                ? "\(provider.cliTool?.loginHint ?? "") You can also set its path, or switch to an API key, in Settings (⚙️)."
+                : "Set your \(provider.rawValue) API key in Settings (⚙️)."
+            state.messages[aiMessageIndex].content = "⚠️ \(provider.rawValue) — \(problem). \(fix)"
             state.isProcessing = false
             return
         }
 
-        LLMService.shared.streamCompletion(
+        LLMService.shared.send(
             provider: provider,
+            authMethod: authMethod,
             model: model,
             prompt: prompt,
             context: context,

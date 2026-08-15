@@ -19,6 +19,7 @@ swiftc -o "$MACOS_DIR/MacIntelligence" \
       "Source/Models/AppState.swift" \
       "Source/Models/ChatMessage.swift" \
       "Source/Services/KeychainService.swift" \
+      "Source/Services/CLIBackend.swift" \
       "Source/Services/LLMService.swift" \
       "Source/Services/HotKeyService.swift" \
       "Source/Services/CaptureService.swift" \

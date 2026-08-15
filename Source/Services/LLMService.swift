@@ -1,20 +1,21 @@
 import Foundation
 
-/// Service for interacting with LLM providers (OpenAI, Gemini, Anthropic).
+/// Talks to an LLM provider over whichever auth path is selected.
+///
+/// - `.oauth` delegates to the vendor's own signed-in CLI (`codex`, `claude`, `agy`) via
+///   `CLIBackend`. The CLI owns the OAuth session; this app never sees a token.
+/// - `.apiKey` calls the provider's REST endpoint directly with the user's key.
 class LLMService: NSObject, URLSessionDataDelegate {
     static let shared = LLMService()
-
-    enum Provider {
-        case openai
-        case gemini
-        case anthropic
-    }
 
     private var session: URLSession!
     private var onUpdate: ((String) -> Void)?
     private var onComplete: (() -> Void)?
     private var buffer = Data()
-    private var currentProvider: Provider = .openai
+    private var currentProvider: AppState.AIProvider = .openai
+
+    static let systemPrompt = "You are Mac Intelligence, a helpful macOS AI assistant. "
+        + "Provide extremely concise, high-quality answers. Use Markdown for formatting."
 
     override init() {
         super.init()
@@ -22,7 +23,78 @@ class LLMService: NSObject, URLSessionDataDelegate {
         self.session = URLSession(configuration: config, delegate: self, delegateQueue: .main)
     }
 
-    func streamCompletion(provider: Provider, model: String, prompt: String, context: String?, history: [ChatMessage] = [], apiKey: String, useWebSearch: Bool = false, onUpdate: @escaping (String) -> Void, onComplete: @escaping () -> Void) {
+    // MARK: - Entry point
+
+    func send(provider: AppState.AIProvider,
+              authMethod: AppState.AuthMethod,
+              model: String,
+              prompt: String,
+              context: String?,
+              history: [ChatMessage] = [],
+              apiKey: String,
+              useWebSearch: Bool = false,
+              onUpdate: @escaping (String) -> Void,
+              onComplete: @escaping () -> Void) {
+
+        if authMethod == .oauth, let tool = provider.cliTool {
+            // The CLIs are one-shot processes with no memory of the panel's thread, so the
+            // whole conversation is flattened into a single prompt.
+            CLIBackend.shared.stream(
+                tool: tool,
+                model: model,
+                systemPrompt: LLMService.systemPrompt
+                    + " Answer directly from the text given to you. Do not use tools.",
+                prompt: flatPrompt(prompt: prompt, context: context, history: history),
+                onUpdate: onUpdate,
+                onComplete: onComplete)
+            return
+        }
+
+        guard provider.supportsAPIKey else {
+            onUpdate("❌ \(provider.rawValue) has no API-key path — it is subscription-only. "
+                     + "Switch it back to OAuth in Settings.")
+            onComplete()
+            return
+        }
+
+        streamHTTP(provider: provider, model: model, prompt: prompt, context: context,
+                   history: history, apiKey: apiKey, useWebSearch: useWebSearch,
+                   onUpdate: onUpdate, onComplete: onComplete)
+    }
+
+    func cancel() {
+        CLIBackend.shared.cancel()
+    }
+
+    /// Collapses prior turns, captured context, and the new question into one self-contained
+    /// prompt for a headless CLI invocation. The system prompt is passed separately —
+    /// `CLIBackend` routes it to `--system-prompt` where the CLI supports it.
+    private func flatPrompt(prompt: String, context: String?, history: [ChatMessage]) -> String {
+        var parts: [String] = []
+        if !history.isEmpty {
+            let transcript = history.map { msg in
+                "\(msg.role == .user ? "User" : "Assistant"): \(msg.content)"
+            }.joined(separator: "\n\n")
+            parts.append("Conversation so far:\n\(transcript)")
+        }
+        if let context = context, !context.isEmpty {
+            parts.append("Context:\n\(context)")
+        }
+        parts.append("Question: \(prompt)")
+        return parts.joined(separator: "\n\n---\n\n")
+    }
+
+    // MARK: - Direct REST (API key)
+
+    private func streamHTTP(provider: AppState.AIProvider,
+                            model: String,
+                            prompt: String,
+                            context: String?,
+                            history: [ChatMessage],
+                            apiKey: String,
+                            useWebSearch: Bool,
+                            onUpdate: @escaping (String) -> Void,
+                            onComplete: @escaping () -> Void) {
         self.onUpdate = onUpdate
         self.onComplete = onComplete
         self.buffer = Data()
@@ -32,7 +104,7 @@ class LLMService: NSObject, URLSessionDataDelegate {
         var request: URLRequest
         let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let systemPrompt = "You are Mac Intelligence, a helpful macOS AI assistant. Provide extremely concise, high-quality answers. Use Markdown for formatting."
+        let systemPrompt = LLMService.systemPrompt
         let currentPayload = context != nil && !context!.isEmpty ? "Context: \(context!)\n\nQuestion: \(prompt)" : prompt
 
         switch provider {
@@ -112,6 +184,12 @@ class LLMService: NSObject, URLSessionDataDelegate {
                 ]
             }
             request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        case .antigravity:
+            // Guarded by send(...); Antigravity is subscription-only.
+            onUpdate("❌ Antigravity has no REST endpoint.")
+            onComplete()
+            return
         }
 
         let task = session.dataTask(with: request)
@@ -179,6 +257,8 @@ class LLMService: NSObject, URLSessionDataDelegate {
                        let text = parts.first?["text"] as? String {
                         onUpdate?(text)
                     }
+                case .antigravity:
+                    break
                 }
             }
         }
