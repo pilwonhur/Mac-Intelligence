@@ -169,7 +169,17 @@ agy      # sign in with your Google account
 
 ### Feature Toggles
 
-- **🌐 Web Search**: Enable real-time web search for current events and live data (Gemini only)
+- **🌐 Web Search**: Enable real-time web search for current events and live data. Availability depends on the provider **and** its auth method:
+
+| Provider | Auth | Web search |
+|----------|------|------------|
+| OpenAI | OAuth (`codex`) | ✅ via `tools.web_search` |
+| Anthropic | OAuth (`claude`) | ✅ via the WebSearch tool |
+| Google Gemini | API key | ✅ via `google_search` grounding |
+| Antigravity | OAuth (`agy`) | ❌ headless runs auto-deny tool permissions |
+| OpenAI / Anthropic | API key | ❌ not sent in this app's request body |
+
+The toggle greys out with a short reason when the current combination cannot search.
 
 ### Built-in Models
 

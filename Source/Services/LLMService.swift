@@ -39,12 +39,15 @@ class LLMService: NSObject, URLSessionDataDelegate {
         if authMethod == .oauth, let tool = provider.cliTool {
             // The CLIs are one-shot processes with no memory of the panel's thread, so the
             // whole conversation is flattened into a single prompt.
+            let searching = useWebSearch && tool.supportsWebSearch
             CLIBackend.shared.stream(
                 tool: tool,
                 model: model,
-                systemPrompt: LLMService.systemPrompt
-                    + " Answer directly from the text given to you. Do not use tools.",
+                systemPrompt: LLMService.systemPrompt + (searching
+                    ? " Search the web when the answer depends on current information."
+                    : " Answer directly from the text given to you. Do not use tools."),
                 prompt: flatPrompt(prompt: prompt, context: context, history: history),
+                useWebSearch: searching,
                 onUpdate: onUpdate,
                 onComplete: onComplete)
             return

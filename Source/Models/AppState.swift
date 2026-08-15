@@ -192,6 +192,16 @@ class AppState: ObservableObject {
         }
     }
 
+    /// Whether the web-search toggle applies to how this provider is currently configured.
+    /// On OAuth the CLI's own search tool does the work; on the API-key path only Gemini
+    /// sends a search tool in its request body.
+    func supportsWebSearch(for provider: AIProvider) -> Bool {
+        switch authMethod(for: provider) {
+        case .oauth:  return provider.cliTool?.supportsWebSearch ?? false
+        case .apiKey: return provider == .gemini
+        }
+    }
+
     /// Short reason the provider cannot run, for the header badge and Settings.
     func authProblem(for provider: AIProvider) -> String? {
         guard !isAuthReady(for: provider) else { return nil }

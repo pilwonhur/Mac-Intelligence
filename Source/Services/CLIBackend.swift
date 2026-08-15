@@ -108,6 +108,12 @@ final class CLIBackend {
             case .agy:    return "Run `agy` in Terminal and sign in."
             }
         }
+
+        /// `claude` has WebSearch/WebFetch and `codex` has `--search`. `agy` has a
+        /// `search_web` tool, but headless runs auto-deny tool permissions and the only
+        /// override is `--dangerously-skip-permissions`, which would also auto-approve
+        /// file writes and shell commands — too broad for this app.
+        var supportsWebSearch: Bool { self != .agy }
     }
 
     private var process: Process?
@@ -124,6 +130,7 @@ final class CLIBackend {
                 model: String,
                 systemPrompt: String,
                 prompt: String,
+                useWebSearch: Bool = false,
                 onUpdate: @escaping (String) -> Void,
                 onComplete: @escaping () -> Void) {
 
@@ -141,8 +148,9 @@ final class CLIBackend {
 
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: binary)
-        proc.arguments = arguments(for: tool, model: model,
-                                   systemPrompt: systemPrompt, prompt: prompt)
+        proc.arguments = arguments(for: tool, model: model, systemPrompt: systemPrompt,
+                                   prompt: prompt,
+                                   useWebSearch: useWebSearch && tool.supportsWebSearch)
         proc.currentDirectoryURL = scratchDirectory()
         proc.environment = childEnvironment()
 
@@ -203,8 +211,14 @@ final class CLIBackend {
 
     // MARK: - Command lines
 
-    private func arguments(for tool: Tool, model: String, systemPrompt: String, prompt: String) -> [String] {
+    private func arguments(for tool: Tool, model: String, systemPrompt: String,
+                           prompt: String, useWebSearch: Bool) -> [String] {
         let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Everything except the search tools stays blocked: this is a Q&A panel, not a
+        // coding agent pointed at the user's disk.
+        let blockedTools = useWebSearch
+            ? "Bash,Edit,Write,Read,Task,Skill,NotebookEdit"
+            : "Bash,Edit,Write,Read,Task,Skill,WebSearch,WebFetch,NotebookEdit"
         switch tool {
         case .claude:
             // stream-json requires --verbose with -p; --include-partial-messages gives deltas.
@@ -226,13 +240,18 @@ final class CLIBackend {
                         "--setting-sources", "",
                         "--system-prompt", systemPrompt,
                         "--exclude-dynamic-system-prompt-sections",
-                        "--disallowed-tools",
-                        "Bash,Edit,Write,Read,Task,Skill,WebSearch,WebFetch,NotebookEdit"]
+                        "--disallowed-tools", blockedTools]
+            // Dropping the search tools from --disallowed-tools is not enough — without an
+            // explicit --allowed-tools the model reports no web search tool available.
+            if useWebSearch { args += ["--allowed-tools", "WebSearch,WebFetch"] }
             if !model.isEmpty { args += ["--model", model] }
             return args
         case .codex:
             // No --system-prompt equivalent, so it rides along in the prompt text.
             var args = ["exec", "--json", "--skip-git-repo-check", "-s", "read-only"]
+            // `--search` exists only on the top-level `codex` command, not on `exec`,
+            // where the equivalent is a config override.
+            if useWebSearch { args += ["-c", "tools.web_search=true"] }
             if !model.isEmpty { args += ["-m", model] }
             return args + ["\(systemPrompt)\n\n\(prompt)"]
         case .agy:

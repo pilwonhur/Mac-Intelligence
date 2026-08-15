@@ -192,10 +192,10 @@ struct MainView: View {
                         .font(.system(size: 10, weight: .bold))
                     }
                     .toggleStyle(.checkbox)
-                    .disabled(state.selectedProvider != .gemini)
+                    .disabled(!state.supportsWebSearch(for: state.selectedProvider))
 
-                    if state.selectedProvider != .gemini && state.useWebSearch {
-                        Text("(Gemini only)")
+                    if !state.supportsWebSearch(for: state.selectedProvider) {
+                        Text(webSearchUnavailableReason)
                             .font(.system(size: 8))
                             .foregroundColor(.secondary)
                     }
@@ -207,6 +207,16 @@ struct MainView: View {
         .background(Color.black.opacity(0.1))
     }
     
+    /// Why the toggle is greyed out for the current provider + auth combination.
+    private var webSearchUnavailableReason: String {
+        let provider = state.selectedProvider
+        if provider == .antigravity { return "(not available via Antigravity)" }
+        if state.authMethod(for: provider) == .apiKey && provider != .gemini {
+            return "(switch \(provider.rawValue) to OAuth, or use Gemini)"
+        }
+        return "(not available here)"
+    }
+
     func submitQuery() {
         guard !userPrompt.isEmpty else { return }
         
