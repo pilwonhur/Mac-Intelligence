@@ -261,6 +261,40 @@ class AppState: ObservableObject {
         UserDefaults.standard.set(selectedProvider.rawValue, forKey: "selected_provider")
     }
 
+    // MARK: - Export
+
+    /// The current conversation as a Markdown document: where it came from, the captured
+    /// context, then every message in order.
+    func transcriptMarkdown() -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HH:mm:ss"
+
+        var lines = ["# Mac Intelligence Chat", ""]
+        lines.append("- **Exported:** \(dateFormatter.string(from: Date()))")
+        // Messages do not record which model wrote them, so this is the one selected now.
+        lines.append("- **Model:** \(selectedProvider.rawValue) · \(selectedModel(for: selectedProvider))")
+        if !appName.isEmpty { lines.append("- **Source:** \(appName)") }
+        if let title = sourceTitle, !title.isEmpty { lines.append("- **Title:** \(title)") }
+        if let url = sourceURL, !url.isEmpty { lines.append("- **URL:** \(url)") }
+
+        if !capturedText.isEmpty {
+            lines += ["", "## Context", ""]
+            lines += capturedText
+                .split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+                .map { $0.isEmpty ? ">" : "> \($0)" }
+        }
+
+        lines += ["", "## Conversation"]
+        // An empty message is the placeholder for a reply that has not started streaming.
+        for message in messages where !message.content.isEmpty {
+            let speaker = message.role == .user ? "You" : "Assistant"
+            lines += ["", "### \(speaker) · \(timeFormatter.string(from: message.timestamp))", "", message.content]
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
     func reset() {
         capturedText = ""
         sourceTitle = nil

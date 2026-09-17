@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MainView: View {
     @ObservedObject var state: AppState
@@ -46,7 +47,16 @@ struct MainView: View {
                     }
                 }
                 Spacer()
-                Button(action: { 
+                Button(action: exportChat) {
+                    Image(systemName: "square.and.arrow.down")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Save chat as Markdown")
+                .disabled(state.messages.isEmpty)
+                .opacity(state.messages.isEmpty ? 0.4 : 1)
+
+                Button(action: {
                     state.messages = []
                     state.isProcessing = false
                 }) {
@@ -217,9 +227,34 @@ struct MainView: View {
         return "(not available here)"
     }
 
+    func exportChat() {
+        // Snapshot first — the hotkey can reset the conversation while the save panel is open.
+        let markdown = state.transcriptMarkdown()
+
+        let stamp = DateFormatter()
+        stamp.dateFormat = "yyyy-MM-dd_HHmmss"
+
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
+        savePanel.nameFieldStringValue = "MacIntelligence_Chat_\(stamp.string(from: Date())).md"
+        savePanel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        savePanel.canCreateDirectories = true
+
+        // The ghost panel never activates the app, and without that the save panel cannot
+        // take keyboard input. runModal also lifts it above the floating panel's level.
+        NSApp.activate(ignoringOtherApps: true)
+        guard savePanel.runModal() == .OK, let url = savePanel.url else { return }
+
+        do {
+            try markdown.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            NSAlert(error: error).runModal()
+        }
+    }
+
     func submitQuery() {
         guard !userPrompt.isEmpty else { return }
-        
+
         let prompt = userPrompt
         let context = state.capturedText
         let provider = state.selectedProvider

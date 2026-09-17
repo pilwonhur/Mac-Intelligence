@@ -192,6 +192,7 @@ agy      # sign in with your Google account
 | Submit question | `Enter` |
 | New line in input | `Shift + Enter` |
 | Copy response | `Cmd + C` |
+| Save chat as Markdown | Click ⬇️ icon |
 | Clear chat history | Click 🗑️ icon |
 | Close window | Click ❌ or `Esc` |
 | Quit application | Click ⏻ icon |
