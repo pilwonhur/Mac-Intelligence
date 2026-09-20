@@ -42,7 +42,14 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
             }
             .buttonStyle(.borderedProminent)
-            .padding()
+            .padding([.horizontal, .top])
+            .padding(.bottom, 6)
+
+            Text("Mac Intelligence \(AppVersion.display)")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor(.secondary)
+                .textSelection(.enabled)
+                .padding(.bottom, 8)
         }
         .onAppear {
             configProvider = state.selectedProvider

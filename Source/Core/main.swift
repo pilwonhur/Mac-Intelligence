@@ -42,7 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         
-        print("🚀 Mac Intelligence is running.")
+        print("🚀 Mac Intelligence \(AppVersion.display) is running.")
         print("Trigger: Cmd + Shift + K")
     }
     

@@ -3,6 +3,7 @@
 # Compile and run the integrated Mac Intelligence prototype
 swiftc -o MacIntel \
       "Source/Models/AppState.swift" \
+      "Source/Models/AppVersion.swift" \
       "Source/Models/ChatMessage.swift" \
       "Source/Services/KeychainService.swift" \
       "Source/Services/CLIBackend.swift" \

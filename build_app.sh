@@ -7,7 +7,17 @@ CONTENTS_DIR="$BUNDLE_NAME/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
-echo "🔨 Building $BUNDLE_NAME..."
+# Version: the release number lives in the VERSION file; the build number and commit
+# come from git, so two builds of the same release can still be told apart.
+APP_VERSION="$(tr -d '[:space:]' < VERSION 2>/dev/null)"
+APP_VERSION="${APP_VERSION:-0.0.0}"
+BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 0)"
+GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    GIT_COMMIT="$GIT_COMMIT-dirty"
+fi
+
+echo "🔨 Building $BUNDLE_NAME $APP_VERSION ($BUILD_NUMBER · $GIT_COMMIT)..."
 
 # 1. Create directory structure
 mkdir -p "$MACOS_DIR"
@@ -17,6 +27,7 @@ mkdir -p "$RESOURCES_DIR"
 # Note: We name the executable "MacIntelligence" inside the bundle
 swiftc -o "$MACOS_DIR/MacIntelligence" \
       "Source/Models/AppState.swift" \
+      "Source/Models/AppVersion.swift" \
       "Source/Models/ChatMessage.swift" \
       "Source/Services/KeychainService.swift" \
       "Source/Services/CLIBackend.swift" \
@@ -48,9 +59,11 @@ cat > "$CONTENTS_DIR/Info.plist" <<EOF
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>$APP_VERSION</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$BUILD_NUMBER</string>
+    <key>MIGitCommit</key>
+    <string>$GIT_COMMIT</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
@@ -82,5 +95,5 @@ else
     codesign --force --deep --sign - "$BUNDLE_NAME"
 fi
 
-echo "✅ $BUNDLE_NAME created successfully!"
+echo "✅ $BUNDLE_NAME $APP_VERSION ($BUILD_NUMBER · $GIT_COMMIT) created successfully!"
 echo "🚀 You can now move it to /Applications or open it with 'open $BUNDLE_NAME'"

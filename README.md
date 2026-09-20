@@ -100,6 +100,30 @@ chmod +x run.sh
 ./run.sh
 ```
 
+### Versioning
+
+The version is shown at the bottom of the Settings panel, e.g. `Mac Intelligence 1.1.0 (11 · 7fd0d35)`:
+
+| Part | Source | Meaning |
+|------|--------|---------|
+| `1.1.0` | `VERSION` file | Release version ([semver](https://semver.org)) — bump it by hand |
+| `11` | `git rev-list --count HEAD` | Build number — rises with every commit |
+| `7fd0d35` | `git rev-parse --short HEAD` | Exact commit; `-dirty` means the build had uncommitted changes |
+
+`build_app.sh` stamps all three into `Info.plist`. A `run.sh` binary has no `Info.plist` and reports `dev`.
+
+To cut a release, edit `VERSION`, then commit, tag, and rebuild so the stamp is clean:
+```bash
+git commit -am "Release 1.2.0"
+git tag v1.2.0
+./build_app.sh
+```
+
+To check which version is installed without opening the app:
+```bash
+defaults read /Applications/MacIntelligence.app/Contents/Info CFBundleShortVersionString
+```
+
 ---
 
 ## ⚙️ Configuration
@@ -280,6 +304,7 @@ Mac Intelligence employs a hybrid capture strategy for maximum compatibility:
 mac-intelligence/
 ├── Source/                    # Swift source code
 ├── MacIntelligence.app/       # Built application bundle
+├── VERSION                    # Release version, read by build_app.sh
 ├── build_app.sh               # Production build script
 ├── run.sh                     # Development run script
 ├── PRD.md                     # Product Requirements Document
