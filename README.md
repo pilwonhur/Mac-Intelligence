@@ -46,51 +46,55 @@ The assistant automatically captures:
 
 ## 🛠️ Installation
 
-### Prerequisites
+### Install (one command)
+
+Paste this into Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pilwonhur/Mac-Intelligence/main/install.sh | bash
+```
+
+That's it. The script:
+1. Asks you to install the **Xcode Command Line Tools** if they're missing (a system dialog—click *Install*, then run the command again)
+2. Downloads the source into `~/.mac-intelligence`
+3. Creates a local signing certificate, once, so macOS permissions survive updates (see [Why a signing certificate](#why-a-signing-certificate))
+4. Builds the app, installs it to `/Applications` (or `~/Applications` if that isn't writable), and launches it
+
+Then allow **Accessibility** when macOS asks (System Settings ▸ Privacy & Security ▸ Accessibility) and press `Cmd + Shift + K` in any app.
+
+### Update
+
+Run the **same command** again:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pilwonhur/Mac-Intelligence/main/install.sh | bash
+```
+
+It pulls the latest `main`, rebuilds, quits the running copy, replaces it, and relaunches. If you're already on the latest commit it says so and does nothing; add `-s -- --force` after `bash` to rebuild anyway. Your settings, API keys, and permissions carry over.
+
+### Uninstall
+
+```bash
+pkill -x MacIntelligence; rm -rf /Applications/MacIntelligence.app ~/.mac-intelligence
+```
+
+### Requirements
 
 - **macOS 13.0** (Ventura) or later
-- **Swift 6.0+** (included with Xcode)
+- **Xcode Command Line Tools** (the installer prompts for them; full Xcode is not needed)
 - **One of the following**, for at least one provider:
   - A signed-in vendor CLI — [Codex](https://developers.openai.com/codex/cli) (`codex`), [Claude Code](https://claude.com/claude-code) (`claude`), or [Antigravity](https://antigravity.google/) (`agy`) — for the OAuth path, **or**
   - An **API key** for OpenAI, Anthropic, or Google Gemini
 
-### Build from Source
+### Building from a Checkout
 
-1. **Clone the repository**
-```bash
-git clone https://github.com/pilwonhur/Mac-Intelligence.git
-cd Mac-Intelligence
-```
+If you've cloned the repo yourself, `./install.sh` inside it builds **that checkout** (no GitHub pull) and installs it the same way. To only build the bundle in place without installing:
 
-2. **Create a local signing certificate** (once per machine, recommended)
 ```bash
-chmod +x make_signing_cert.sh
-./make_signing_cert.sh
-```
-Without it the build falls back to ad-hoc signing, and macOS re-prompts for keychain access and Accessibility permission **after every rebuild** — see [Why a signing certificate](#why-a-signing-certificate) below.
-
-3. **Build the application bundle**
-```bash
-chmod +x build_app.sh
 ./build_app.sh
 ```
 
-4. **Move to Applications (optional)**
-```bash
-mv MacIntelligence.app /Applications/
-```
-> `build_app.sh` only rebuilds the copy inside the project folder—it does **not** update `/Applications` automatically. After every rebuild, reinstall manually:
-> ```bash
-> pkill MacIntelligence
-> rm -rf /Applications/MacIntelligence.app
-> cp -R MacIntelligence.app /Applications/
-> ```
-
-5. **Launch the app**
-```bash
-open MacIntelligence.app
-```
-Or find "Mac Intelligence" in Spotlight.
+`compile.sh` builds against the default macOS SDK and, if that fails, falls back to older SDKs installed alongside it. Some Command Line Tools releases ship an SDK whose SwiftUI needs a macro plugin only full Xcode provides (`plugin for module 'SwiftUIMacros' not found`).
 
 ### Development Mode
 
@@ -116,7 +120,8 @@ To cut a release, edit `VERSION`, then commit, tag, and rebuild so the stamp is 
 ```bash
 git commit -am "Release 1.2.0"
 git tag v1.2.0
-./build_app.sh
+git push && git push --tags
+./install.sh
 ```
 
 To check which version is installed without opening the app:
@@ -305,7 +310,9 @@ mac-intelligence/
 ├── Source/                    # Swift source code
 ├── MacIntelligence.app/       # Built application bundle
 ├── VERSION                    # Release version, read by build_app.sh
+├── install.sh                 # One-command install / update from GitHub
 ├── build_app.sh               # Production build script
+├── compile.sh                 # swiftc invocation shared by build_app.sh and run.sh
 ├── run.sh                     # Development run script
 ├── PRD.md                     # Product Requirements Document
 ├── architecture.md            # Technical architecture

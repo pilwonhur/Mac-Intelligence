@@ -23,23 +23,8 @@ echo "🔨 Building $BUNDLE_NAME $APP_VERSION ($BUILD_NUMBER · $GIT_COMMIT)..."
 mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
-# 2. Compile the Swift executable
-# Note: We name the executable "MacIntelligence" inside the bundle
-swiftc -o "$MACOS_DIR/MacIntelligence" \
-      "Source/Models/AppState.swift" \
-      "Source/Models/AppVersion.swift" \
-      "Source/Models/ChatMessage.swift" \
-      "Source/Services/KeychainService.swift" \
-      "Source/Services/CLIBackend.swift" \
-      "Source/Services/LLMService.swift" \
-      "Source/Services/HotKeyService.swift" \
-      "Source/Services/CaptureService.swift" \
-      "Source/Core/GhostPanel.swift" \
-      "Source/Views/SettingsView.swift" \
-      "Source/Views/MainView.swift" \
-      "Source/Core/main.swift"
-
-if [ $? -ne 0 ]; then
+# 2. Compile the Swift executable (named "MacIntelligence" inside the bundle)
+if ! ./compile.sh "$MACOS_DIR/MacIntelligence"; then
     echo "❌ Compilation failed."
     exit 1
 fi
